@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Leaderboard</title>
+</head>
+<body>
+    <h1>Leaderboard</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>Rank</th>
+                <th>Username</th>
+                <th>Puzzles Solved</th>
+                <th>Total Attempts</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for i, score in enumerate(scores) %}
+            <tr>
+                <td>{{ i + 1 }}</td>
+                <td>{{ score.username }}</td>
+                <td>{{ score.total_attempts }}</td>
+                <td>{{ score.total_attempts }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

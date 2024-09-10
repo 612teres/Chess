@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily.chess</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+
+    <script src="https://code.jquery.com/jquery-1.12.4.min.js"></script> </head> 
+<body>
+    <div class="container">
+        <div class="row justify-content-center" style="display: flex;">
+            <div class="col-md-6">
+                <div id="board" style="width: 100%"></div>
+                <button id="hint-button">Hint</button>
+                <button id="solution-button">Solution</button>
+            </div>
+        </div>
+    </div>
+
+    <select id="difficulty-filter">
+        <option value="all">All</option> 
+        <option value="easy">Easy</option>
+        <option value="medium">Medium</option>
+        <option value="hard">Hard</option>
+    </select>
+
+    <div id="overlay" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5);">
+        <div id="overlay-content" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; padding: 20px;">
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.2/chess.js"></script> 
+    <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+    <script>
+        // Array to store the piece information
+    const chessPieces = [
+        { type: 'white_pawn', position: 'a2' },
+        { type: 'black_knight', position: 'b8' },
+        // ... add more pieces here
+    ];
+
+    // Function to fetch an image URL from the Flask backend
+    async function fetchImageUrl(pieceType) {
+        const response = await fetch(`/get_chess_piece_image?piece=${pieceType}`);
+        const data = await response.json();
+    return data.image_url;
+    }
+
+    // Function to create and add an image to the chessboard
+    async function addChessPiece(piece) {
+        const imageUrl = await fetchImageUrl(piece.type);
+        const img = document.createElement('img');
+            img.src = imageUrl;
+            img.alt = piece.type; 
+            img.classList.add('chess-piece'); // Add a class for styling
+            img.dataset.position = piece.position; // Store the position in a data attribute
+            document.getElementById('chessboard').appendChild(img);
+        }
+
+        // Add all the chess pieces to the board
+        chessPieces.forEach(addChessPiece);
+
+        var jQuery = $.noConflict(); // Assign jQuery to a different variable
+
+        document.addEventListener('DOMContentLoaded', (event) => {
+            console.log("DOM fully loaded and parsed");
+
+            // Check if 'puzzle' and 'puzzle.fen' are available
+            console.log("Puzzle data received from Flask:", {{ puzzle | tojson }}); 
+
+            // Access Chessboard from jQuery's prototype
+            var board = Chessboard(jQuery('#board')[0], { 
+                position: '{{ puzzle.fen }}',
+                draggable: true,
+                onDrop: onDrop,
+                pieceTheme: '/static/img/chess_pieces/{piece}.png'
+            });
+
+            console.log("Chessboard initialized:", board);
+
+            // Initialize a chess game object to track the board state
+            var game = new Chess();
+            game.load('{{ puzzle.fen }}');
+
+            console.log("Chess game initialized:", game);
+
+            function onDrop(source, target) {
+                console.log("onDrop called with source:", source, "and target:", target);
+
+                var move = game.move({
+                    from: source,
+                    to: target,
+                    promotion: 'q' 
+                });
+
+                if (move === null) return 'snapback';
+
+                if (game.in_checkmate()) {
+                    alert(game.fen()); 
+
+                    fetch('/update_score/{{ puzzle.id }}', { method: 'POST' })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                // Optionally, update the UI to reflect the new score
+                                console.log("Score updated successfully!");
+                            } else {
+                                alert('Error updating score. Please try again.');
+                            }
+                        });
+                }
+            }
+
+            document.getElementById('difficulty-filter').addEventListener('change', function(){
+                var difficulty = this.value;
+                window.location.href = '/?difficulty=' + difficulty;
+            });
+
+            document.getElementById('hint-button').addEventListener('click', function() {
+                //Fetch hint from the server
+                fetch('/get_hint/{{ puzzle.id }}')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('overlay-content').textContent = data.hint;
+                    document.getElementById('overlay').style.display = 'block';
+                    });
+            });
+
+            document.getElementById('solution-button').addEventListener('click', function() {
+                fetch('/get_solution/{{ puzzle.id }}')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('overlay-content').textContent = data.solution;
+                    document.getElementById('overlay').style.display = 'block';
+                });
+            });
+
+            document.getElementById('overlay').addEventListener('click', function() {
+                this.style.display = 'none';
+            });
+        });
+    </script>
+</body>
+</html>
